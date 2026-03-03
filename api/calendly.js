@@ -1,4 +1,4 @@
-import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote } from '../lib/close.js';
+import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote, findCloseOpportunityByEventUri } from '../lib/close.js';
 import { createGHLContact } from '../lib/ghl.js';
 
 export default async function handler(req, res) {
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     const email = payload?.email ?? null;
     const firstName = payload?.first_name ?? '';
     const lastName = payload?.last_name ?? '';
-    const eventUri = payload?.event ?? '';
+    const eventUri = payload?.uri || payload?.event || '';
     const startTime = payload?.scheduled_event?.start_time ?? null;
     const eventName = payload?.scheduled_event?.name ?? 'Strategy Call';
 
@@ -40,12 +40,21 @@ export default async function handler(req, res) {
     // ── 2. Update lead status to CALL BOOKED ─────────────────────────────────
     await updateCloseLeadStatus(closeLead.id, 'CALL BOOKED');
 
-    // ── 3. Create opportunity on the Close lead ───────────────────────────────
+    // ── 3. Check for existing opportunity to prevent duplicates ───────────────
+    const existingOpp = await findCloseOpportunityByEventUri(closeLead.id, eventUri);
+    let opportunityId;
+
+    if (existingOpp) {
+      console.log(`[calendly] Opportunity already exists for event ${eventUri}. Skipping creation to prevent duplicates.`);
+      return res.status(200).json({ ok: true, skipped: true, reason: 'Duplicate event received' });
+    }
+
     const opportunity = await createCloseOpportunity(
       closeLead.id,
       { email, firstName, lastName },
       { uri: eventUri, start_time: startTime, name: eventName }
     );
+    opportunityId = opportunity.id;
 
     // ── 4. Update GHL contact tag to booked-call ──────────────────────────────
     await createGHLContact(
@@ -87,11 +96,11 @@ Location: ${zoomLink}`;
 
     await createCloseNote(closeLead.id, noteContent);
 
-    console.log(`[calendly] Close lead ${closeLead.id} → CALL BOOKED | Opportunity: ${opportunity.id}`);
+    console.log(`[calendly] Close lead ${closeLead.id} → CALL BOOKED | Opportunity: ${opportunityId}`);
     return res.status(200).json({
       ok: true,
       closeLeadId: closeLead.id,
-      closeOpportunityId: opportunity.id,
+      closeOpportunityId: opportunityId,
     });
 
   } catch (err) {
