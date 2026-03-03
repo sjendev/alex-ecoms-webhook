@@ -1,4 +1,4 @@
-import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus } from '../lib/close.js';
+import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote } from '../lib/close.js';
 import { createGHLContact } from '../lib/ghl.js';
 
 export default async function handler(req, res) {
@@ -15,10 +15,10 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, skipped: true });
     }
 
-    const email     = payload?.email ?? null;
+    const email = payload?.email ?? null;
     const firstName = payload?.first_name ?? '';
-    const lastName  = payload?.last_name ?? '';
-    const eventUri  = payload?.event ?? '';
+    const lastName = payload?.last_name ?? '';
+    const eventUri = payload?.event ?? '';
     const startTime = payload?.scheduled_event?.start_time ?? null;
     const eventName = payload?.scheduled_event?.name ?? 'Strategy Call';
 
@@ -53,10 +53,21 @@ export default async function handler(req, res) {
       ['qualified', 'booked-call']
     );
 
+    // ── 5. Create a note on the Close lead ────────────────────────────────────
+    const zoomLink = payload?.scheduled_event?.location?.join_url ?? 'N/A';
+    const noteContent = `📅 Calendly Call Booked
+
+Event: ${eventName}
+Start Time: ${startTime}
+Zoom Link: ${zoomLink}
+Invitee Email: ${email}`;
+
+    await createCloseNote(closeLead.id, noteContent);
+
     console.log(`[calendly] Close lead ${closeLead.id} → CALL BOOKED | Opportunity: ${opportunity.id}`);
     return res.status(200).json({
       ok: true,
-      closeLeadId:        closeLead.id,
+      closeLeadId: closeLead.id,
       closeOpportunityId: opportunity.id,
     });
 
