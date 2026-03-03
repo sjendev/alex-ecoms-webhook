@@ -55,7 +55,6 @@ export default async function handler(req, res) {
 
     // ── 5. Create a note on the Close lead ────────────────────────────────────
     const eventNameFullName = payload?.scheduled_event?.name ?? 'Strategy Call';
-    const closerName = payload?.scheduled_event?.event_memberships?.[0]?.user_name ?? 'eli Nel';
     const inviteeName = payload?.name || ([firstName, lastName].filter(Boolean).join(' ') || 'Invitee');
 
     let formattedStartTime = startTime || 'N/A';
@@ -79,9 +78,8 @@ export default async function handler(req, res) {
 
     const zoomLink = payload?.scheduled_event?.location?.join_url ?? 'N/A';
 
-    const noteContent = `${eventNameFullName} - ${closerName} - ${inviteeName}
+    const noteContent = `${eventNameFullName} - ${inviteeName}
 
-Closer: ${closerName}
 Start Time: ${formattedStartTime}
 Duration: ${durationStr}
 
