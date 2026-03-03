@@ -1,6 +1,6 @@
 import { parseTypeformPayload } from '../lib/typeform.js';
 import { createGHLContact, enrollGHLWorkflow, updateGHLOpportunity } from '../lib/ghl.js';
-import { createCloseLead } from '../lib/close.js';
+import { createCloseLead, createCloseNote } from '../lib/close.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -49,12 +49,21 @@ export default async function handler(req, res) {
 
       const closeLead = await createCloseLead(lead);
 
+      const noteContent = `📄 Typeform Submission
+
+Budget: ${lead.budgetLabel || 'N/A'}
+Experience: ${lead.experience || 'N/A'}
+Situation: ${lead.situation || 'N/A'}
+Form Token: ${lead.formResponseToken || 'N/A'}`;
+
+      await createCloseNote(closeLead.id, noteContent);
+
       console.log(`[typeform] Qualified — GHL: ${contact.id} | Close: ${closeLead.id}`);
       return res.status(200).json({
         ok: true,
         path: 'qualified',
         ghlContactId: contact.id,
-        closeLeadId:  closeLead.id,
+        closeLeadId: closeLead.id,
       });
     }
 
