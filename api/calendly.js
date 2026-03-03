@@ -54,13 +54,38 @@ export default async function handler(req, res) {
     );
 
     // ── 5. Create a note on the Close lead ────────────────────────────────────
-    const zoomLink = payload?.scheduled_event?.location?.join_url ?? 'N/A';
-    const noteContent = `📅 Calendly Call Booked
+    const eventNameFullName = payload?.scheduled_event?.name ?? 'Strategy Call';
+    const closerName = payload?.scheduled_event?.event_memberships?.[0]?.user_name ?? 'eli Nel';
+    const inviteeName = payload?.name || ([firstName, lastName].filter(Boolean).join(' ') || 'Invitee');
 
-Event: ${eventName}
-Start Time: ${startTime}
-Zoom Link: ${zoomLink}
-Invitee Email: ${email}`;
+    let formattedStartTime = startTime || 'N/A';
+    try {
+      if (startTime) {
+        const d = new Date(startTime);
+        formattedStartTime = new Intl.DateTimeFormat('en-US', {
+          hour: '2-digit', minute: '2-digit', hour12: true,
+          weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
+          timeZoneName: 'short'
+        }).format(d).replace(/, /g, ' - ').replace('  ', ' '); // approximate target format
+      }
+    } catch (e) { }
+
+    const endTime = payload?.scheduled_event?.end_time;
+    let durationStr = '45 minutes';
+    if (startTime && endTime) {
+      const diffMins = Math.round((new Date(endTime) - new Date(startTime)) / 60000);
+      if (diffMins > 0) durationStr = `${diffMins} minutes`;
+    }
+
+    const zoomLink = payload?.scheduled_event?.location?.join_url ?? 'N/A';
+
+    const noteContent = `${eventNameFullName} - ${closerName} - ${inviteeName}
+
+Closer: ${closerName}
+Start Time: ${formattedStartTime}
+Duration: ${durationStr}
+
+Location: ${zoomLink}`;
 
     await createCloseNote(closeLead.id, noteContent);
 
