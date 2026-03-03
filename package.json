@@ -1,0 +1,9 @@
+{
+  "name": "alex-ecoms-webhook",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Typeform → GHL + Close.com webhook server for Alex Ecoms VSL funnel",
+  "engines": {
+    "node": ">=18"
+  }
+}
