@@ -49,12 +49,17 @@ export default async function handler(req, res) {
 
       const closeLead = await createCloseLead(lead);
 
-      const noteContent = `📄 Typeform Submission
+      const noteContent = `📋 Typeform Submission
+
+Name: ${lead.firstName} ${lead.lastName}
+Email: ${lead.email}
+Phone: ${lead.phone}
 
 Budget: ${lead.budgetLabel || 'N/A'}
 Experience: ${lead.experience || 'N/A'}
 Situation: ${lead.situation || 'N/A'}
-Form Token: ${lead.formResponseToken || 'N/A'}`;
+Source: Typeform - Alex Ecoms VSL
+Submitted: ${lead.submittedAt || 'N/A'}`;
 
       await createCloseNote(closeLead.id, noteContent);
 
