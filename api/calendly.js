@@ -1,4 +1,4 @@
-import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote, findActiveCloseOpportunity } from '../lib/close.js';
+import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote, findAllActiveOpportunities, deleteCloseOpportunity } from '../lib/close.js';
 import { createGHLContact } from '../lib/ghl.js';
 
 // In-memory cache to catch exact-millisecond duplicates hitting the same serverless instance
@@ -54,27 +54,40 @@ export default async function handler(req, res) {
     // ── 2. Update lead status to CALL BOOKED ─────────────────────────────────
     await updateCloseLeadStatus(closeLead.id, 'CALL BOOKED');
 
-    // ── 3. Fixed delay to let any concurrent instance finish writing ──────────
-    console.log(`[calendly] Waiting 3s before opportunity check for lead ${closeLead.id}...`);
-    await new Promise(r => setTimeout(r, 3000));
+    // ── 3. Create opportunity (both concurrent instances may do this) ─────────
+    const myOpp = await createCloseOpportunity(
+      closeLead.id,
+      { email, firstName, lastName },
+      { uri: eventUri, start_time: startTime, name: eventName }
+    );
+    console.log(`[calendly] Created opportunity ${myOpp.id} for lead ${closeLead.id}`);
 
-    // ── 4. Check for existing active opportunity to prevent duplicates ────────
-    const existingOpp = await findActiveCloseOpportunity(closeLead.id);
-    let opportunityId;
+    // ── 4. Wait 1s then reconcile duplicates ──────────────────────────────────
+    await new Promise(r => setTimeout(r, 1000));
 
-    if (existingOpp) {
-      console.log(`[calendly] Active opportunity already exists for lead ${closeLead.id}. Skipping opportunity creation.`);
-      opportunityId = existingOpp.id;
-    } else {
-      const opportunity = await createCloseOpportunity(
-        closeLead.id,
-        { email, firstName, lastName },
-        { uri: eventUri, start_time: startTime, name: eventName }
-      );
-      opportunityId = opportunity.id;
+    const allOpps = await findAllActiveOpportunities(closeLead.id);
+    console.log(`[calendly] Found ${allOpps.length} active opportunities for lead ${closeLead.id}`);
+
+    if (allOpps.length > 1) {
+      // Keep the oldest opportunity, delete the rest
+      allOpps.sort((a, b) => new Date(a.date_created) - new Date(b.date_created));
+      const keepId = allOpps[0].id;
+
+      for (const opp of allOpps.slice(1)) {
+        console.log(`[calendly] Deleting duplicate opportunity ${opp.id}`);
+        await deleteCloseOpportunity(opp.id);
+      }
+
+      // If MY opportunity was NOT the one kept, skip note creation
+      if (myOpp.id !== keepId) {
+        console.log(`[calendly] My opportunity ${myOpp.id} was a duplicate. Skipping note.`);
+        return res.status(200).json({ ok: true, deduplicated: true });
+      }
     }
 
-    // ── 4. Update GHL contact tag to booked-call ──────────────────────────────
+    const opportunityId = allOpps.length > 1 ? allOpps[0].id : myOpp.id;
+
+    // ── 5. Update GHL contact tag to booked-call ──────────────────────────────
     await createGHLContact(
       { firstName, lastName, email, phone: '', budgetLabel: '', experience: '', situation: '' },
       ['qualified', 'booked-call']
