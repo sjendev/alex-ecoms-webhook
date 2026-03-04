@@ -1,4 +1,4 @@
-import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote, findCloseOpportunityByEventUri } from '../lib/close.js';
+import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote, findActiveCloseOpportunity } from '../lib/close.js';
 import { createGHLContact } from '../lib/ghl.js';
 
 // In-memory cache to catch exact-millisecond duplicates hitting the same serverless instance
@@ -54,13 +54,13 @@ export default async function handler(req, res) {
     // ── 2. Update lead status to CALL BOOKED ─────────────────────────────────
     await updateCloseLeadStatus(closeLead.id, 'CALL BOOKED');
 
-    // ── 3. Check for existing opportunity to prevent duplicates ───────────────
-    const existingOpp = await findCloseOpportunityByEventUri(closeLead.id, eventUri);
+    // ── 3. Check for existing active opportunity to prevent duplicates ────────
+    const existingOpp = await findActiveCloseOpportunity(closeLead.id);
     let opportunityId;
 
     if (existingOpp) {
-      console.log(`[calendly] Opportunity already exists for event ${eventUri}. Skipping creation to prevent duplicates.`);
-      return res.status(200).json({ ok: true, skipped: true, reason: 'Duplicate event received' });
+      console.log(`[calendly] Active opportunity already exists for lead ${closeLead.id}. Skipping creation to prevent duplicates.`);
+      return res.status(200).json({ ok: true, skipped: true, reason: 'Active opportunity already exists' });
     }
 
     const opportunity = await createCloseOpportunity(
