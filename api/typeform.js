@@ -55,9 +55,15 @@ Name: ${lead.firstName} ${lead.lastName}
 Email: ${lead.email}
 Phone: ${lead.phone}
 
+What is your monthly budget for scaling your ecom store?
 Budget: ${lead.budgetLabel || 'N/A'}
+
+What best describes your current ecommerce experience?
 Experience: ${lead.experience || 'N/A'}
+
+What is your current situation?
 Situation: ${lead.situation || 'N/A'}
+
 Source: Typeform - Alex Ecoms VSL
 Submitted: ${lead.submittedAt || 'N/A'}`;
 
