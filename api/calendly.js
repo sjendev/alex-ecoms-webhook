@@ -1,6 +1,9 @@
 import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote, findCloseOpportunityByEventUri } from '../lib/close.js';
 import { createGHLContact } from '../lib/ghl.js';
 
+// In-memory cache to catch exact-millisecond duplicates hitting the same serverless instance
+const processedEvents = new Set();
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -22,6 +25,17 @@ export default async function handler(req, res) {
     const startTime = payload?.scheduled_event?.start_time ?? null;
     const eventName = payload?.scheduled_event?.name ?? 'Strategy Call';
 
+    if (!eventUri) return res.status(200).json({ ok: false, error: 'No event URI' });
+
+    // ── 0. Instant Memory Lock (catches same-instance race conditions) ────────
+    if (processedEvents.has(eventUri)) {
+      console.log(`[calendly] INSTANT CACHE: Duplicate detected for ${eventUri}. Dropping.`);
+      return res.status(200).json({ ok: true, skipped: true, reason: 'Instant cache hit' });
+    }
+    processedEvents.add(eventUri);
+    // Cleanup memory after 2 minutes
+    setTimeout(() => processedEvents.delete(eventUri), 120000);
+
     if (!email) {
       console.warn('[calendly] No email in payload — cannot match lead');
       return res.status(200).json({ ok: false, error: 'No email in payload' });
@@ -41,6 +55,12 @@ export default async function handler(req, res) {
     await updateCloseLeadStatus(closeLead.id, 'CALL BOOKED');
 
     // ── 3. Check for existing opportunity to prevent duplicates ───────────────
+    // Random jitter delay (0 to 2500ms) to stagger concurrent requests hitting different instances
+    const jitterStr = process.env.VERCEL_REGION || 'local';
+    const waitTime = Math.floor(Math.random() * 2500);
+    console.log(`[calendly] Staggering execution by ${waitTime}ms to prevent Close API race condition...`);
+    await new Promise(r => setTimeout(r, waitTime));
+
     const existingOpp = await findCloseOpportunityByEventUri(closeLead.id, eventUri);
     let opportunityId;
 
