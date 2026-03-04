@@ -54,21 +54,25 @@ export default async function handler(req, res) {
     // ── 2. Update lead status to CALL BOOKED ─────────────────────────────────
     await updateCloseLeadStatus(closeLead.id, 'CALL BOOKED');
 
-    // ── 3. Check for existing active opportunity to prevent duplicates ────────
+    // ── 3. Fixed delay to let any concurrent instance finish writing ──────────
+    console.log(`[calendly] Waiting 3s before opportunity check for lead ${closeLead.id}...`);
+    await new Promise(r => setTimeout(r, 3000));
+
+    // ── 4. Check for existing active opportunity to prevent duplicates ────────
     const existingOpp = await findActiveCloseOpportunity(closeLead.id);
     let opportunityId;
 
     if (existingOpp) {
-      console.log(`[calendly] Active opportunity already exists for lead ${closeLead.id}. Skipping creation to prevent duplicates.`);
-      return res.status(200).json({ ok: true, skipped: true, reason: 'Active opportunity already exists' });
+      console.log(`[calendly] Active opportunity already exists for lead ${closeLead.id}. Skipping opportunity creation.`);
+      opportunityId = existingOpp.id;
+    } else {
+      const opportunity = await createCloseOpportunity(
+        closeLead.id,
+        { email, firstName, lastName },
+        { uri: eventUri, start_time: startTime, name: eventName }
+      );
+      opportunityId = opportunity.id;
     }
-
-    const opportunity = await createCloseOpportunity(
-      closeLead.id,
-      { email, firstName, lastName },
-      { uri: eventUri, start_time: startTime, name: eventName }
-    );
-    opportunityId = opportunity.id;
 
     // ── 4. Update GHL contact tag to booked-call ──────────────────────────────
     await createGHLContact(
