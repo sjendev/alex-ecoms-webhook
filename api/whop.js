@@ -9,8 +9,10 @@ export default async function handler(req, res) {
         const body = req.body;
         const event = body.event || body.action || '';
 
-        // Only care about successful payments
-        if (event !== 'payment.succeeded') {
+        // Accept both V1 (underscore) and V2+ (dot) event naming
+        const isPaymentSuccess = ['payment.succeeded', 'payment_succeeded'].includes(event);
+
+        if (!isPaymentSuccess) {
             console.log('[whop] Ignoring event:', event);
             return res.status(200).json({ ok: true, skipped: true });
         }
