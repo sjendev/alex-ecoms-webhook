@@ -55,12 +55,6 @@ export default async function handler(req, res) {
     await updateCloseLeadStatus(closeLead.id, 'CALL BOOKED');
 
     // ── 3. Check for existing opportunity to prevent duplicates ───────────────
-    // Random jitter delay (0 to 2500ms) to stagger concurrent requests hitting different instances
-    const jitterStr = process.env.VERCEL_REGION || 'local';
-    const waitTime = Math.floor(Math.random() * 2500);
-    console.log(`[calendly] Staggering execution by ${waitTime}ms to prevent Close API race condition...`);
-    await new Promise(r => setTimeout(r, waitTime));
-
     const existingOpp = await findCloseOpportunityByEventUri(closeLead.id, eventUri);
     let opportunityId;
 
