@@ -1,5 +1,6 @@
 import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote, findAllActiveOpportunities, deleteCloseOpportunity } from '../lib/close.js';
 import { createGHLContact } from '../lib/ghl.js';
+import { sendSlackMessage } from '../lib/slack.js';
 
 // In-memory cache to catch exact-millisecond duplicates hitting the same serverless instance
 const processedEvents = new Set();
@@ -126,6 +127,23 @@ Duration: ${durationStr}
 Location: ${zoomLink}`;
 
     await createCloseNote(closeLead.id, noteContent);
+
+    // ── 6. Send Slack notification to #new-calls-booked ───────────────────────
+    try {
+      const slackMessage = `📞 *New Call Booked!*
+
+*Name:* ${inviteeName}
+*Email:* ${email}
+*Event:* ${eventNameFullName}
+*Start Time:* ${formattedStartTime}
+*Duration:* ${durationStr}
+*Zoom:* ${zoomLink}`;
+
+      await sendSlackMessage(slackMessage, process.env.SLACK_CALLS_WEBHOOK_URL);
+      console.log(`[calendly] Slack notification sent for ${email}`);
+    } catch (slackErr) {
+      console.error('[calendly] Slack notification failed:', slackErr.message);
+    }
 
     console.log(`[calendly] Close lead ${closeLead.id} → CALL BOOKED | Opportunity: ${opportunityId}`);
     return res.status(200).json({
