@@ -1,4 +1,4 @@
-import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote, findAllActiveOpportunities, deleteCloseOpportunity } from '../lib/close.js';
+import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote, findOpportunityByCalendlyUri } from '../lib/close.js';
 import { createGHLContact } from '../lib/ghl.js';
 import { sendSlackMessage } from '../lib/slack.js';
 
@@ -44,6 +44,7 @@ export default async function handler(req, res) {
 
     console.log(`[calendly] Booking received for: ${email}`);
 
+
     // ── 1. Find Close lead by email ───────────────────────────────────────────
     const closeLead = await findCloseLeadByEmail(email);
 
@@ -55,38 +56,20 @@ export default async function handler(req, res) {
     // ── 2. Update lead status to CALL BOOKED ─────────────────────────────────
     await updateCloseLeadStatus(closeLead.id, 'CALL BOOKED');
 
-    // ── 3. Create opportunity (both concurrent instances may do this) ─────────
+    // ── 3. Check for existing opportunity for this Calendly event ─────────────
+    const existingOpp = await findOpportunityByCalendlyUri(closeLead.id, eventUri);
+    if (existingOpp) {
+      console.log(`[calendly] Opportunity already exists (${existingOpp.id}) for event ${eventUri}. Skipping.`);
+      return res.status(200).json({ ok: true, skipped: true, reason: 'Opportunity already exists' });
+    }
+
+    // ── 4. Create opportunity ─────────────────────────────────────────────────
     const myOpp = await createCloseOpportunity(
       closeLead.id,
       { email, firstName, lastName },
       { uri: eventUri, start_time: startTime, name: eventName }
     );
-    console.log(`[calendly] Created opportunity ${myOpp.id} for lead ${closeLead.id}`);
-
-    // ── 4. Wait 1s then reconcile duplicates ──────────────────────────────────
-    await new Promise(r => setTimeout(r, 1000));
-
-    const allOpps = await findAllActiveOpportunities(closeLead.id);
-    console.log(`[calendly] Found ${allOpps.length} active opportunities for lead ${closeLead.id}`);
-
-    if (allOpps.length > 1) {
-      // Keep the oldest opportunity, delete the rest
-      allOpps.sort((a, b) => new Date(a.date_created) - new Date(b.date_created));
-      const keepId = allOpps[0].id;
-
-      for (const opp of allOpps.slice(1)) {
-        console.log(`[calendly] Deleting duplicate opportunity ${opp.id}`);
-        await deleteCloseOpportunity(opp.id);
-      }
-
-      // If MY opportunity was NOT the one kept, skip note creation
-      if (myOpp.id !== keepId) {
-        console.log(`[calendly] My opportunity ${myOpp.id} was a duplicate. Skipping note.`);
-        return res.status(200).json({ ok: true, deduplicated: true });
-      }
-    }
-
-    const opportunityId = allOpps.length > 1 ? allOpps[0].id : myOpp.id;
+    const opportunityId = myOpp.id;
 
     // ── 5. Update GHL contact tag to booked-call ──────────────────────────────
     await createGHLContact(
@@ -110,34 +93,13 @@ export default async function handler(req, res) {
       }
     } catch (e) { }
 
-    const endTime = payload?.scheduled_event?.end_time;
-    let durationStr = '45 minutes';
-    if (startTime && endTime) {
-      const diffMins = Math.round((new Date(endTime) - new Date(startTime)) / 60000);
-      if (diffMins > 0) durationStr = `${diffMins} minutes`;
-    }
-
-    const zoomLink = payload?.scheduled_event?.location?.join_url ?? 'N/A';
-
-    const noteContent = `${eventNameFullName} - ${inviteeName}
-
-Start Time: ${formattedStartTime}
-Duration: ${durationStr}
-
-Location: ${zoomLink}`;
+    const noteContent = `${eventNameFullName} - ${inviteeName}\n\nStart Time: ${formattedStartTime}`;
 
     await createCloseNote(closeLead.id, noteContent);
 
     // ── 6. Send Slack notification to #new-calls-booked ───────────────────────
     try {
-      const slackMessage = `📞 *New Call Booked!*
-
-*Name:* ${inviteeName}
-*Email:* ${email}
-*Event:* ${eventNameFullName}
-*Start Time:* ${formattedStartTime}
-*Duration:* ${durationStr}
-*Zoom:* ${zoomLink}`;
+      const slackMessage = `📞 *New Call Booked!*\n\n*Name:* ${inviteeName}\n*Email:* ${email}\n*Event:* ${eventNameFullName}\n*Start Time:* ${formattedStartTime}`;
 
       await sendSlackMessage(slackMessage, process.env.SLACK_CALLS_WEBHOOK_URL);
       console.log(`[calendly] Slack notification sent for ${email}`);

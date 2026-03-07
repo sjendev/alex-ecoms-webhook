@@ -34,11 +34,9 @@ export default async function handler(req, res) {
 
         const message = `💰 *New Payment Received!*
 
-*Customer:* ${customerName ? `${customerName} (${customerEmail})` : customerEmail}
-*Product:* ${productName}
-*Amount:* ${formattedAmount} ${currency}
-*Payment ID:* ${paymentId}
-*Date:* ${new Date(createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}`;
+*Name:* ${customerName || 'N/A'}
+*Email:* ${customerEmail}
+*Amount:* ${formattedAmount}`;
 
         await sendSlackMessage(message);
 
