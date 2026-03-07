@@ -93,7 +93,16 @@ export default async function handler(req, res) {
       }
     } catch (e) { }
 
-    const noteContent = `${eventNameFullName} - ${inviteeName}\n\nStart Time: ${formattedStartTime}`;
+    const endTime = payload?.scheduled_event?.end_time;
+    let durationStr = '45 minutes';
+    if (startTime && endTime) {
+      const diffMins = Math.round((new Date(endTime) - new Date(startTime)) / 60000);
+      if (diffMins > 0) durationStr = `${diffMins} minutes`;
+    }
+
+    const zoomLink = payload?.scheduled_event?.location?.join_url ?? 'N/A';
+
+    const noteContent = `${eventNameFullName} - ${inviteeName}\n\nStart Time: ${formattedStartTime}\nDuration: ${durationStr}\n\nLocation: ${zoomLink}`;
 
     await createCloseNote(closeLead.id, noteContent);
 
