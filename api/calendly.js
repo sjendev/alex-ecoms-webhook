@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     const eventName = payload?.scheduled_event?.name ?? 'Strategy Call';
 
     const isInstagram = eventName.toLowerCase().includes('ig');
-    const source = isInstagram ? 'instagram' : 'vsl';
+    const source = isInstagram ? 'instagram' : 'youtube';
 
     if (!eventUri) return res.status(200).json({ ok: false, error: 'No event URI' });
 
@@ -53,7 +53,7 @@ export default async function handler(req, res) {
 
     if (!closeLead) {
       console.log(`[calendly] No Close lead for ${email} — creating new lead (source: ${source})`);
-      const closeSource = isInstagram ? 'Instagram Booking' : 'VSL Booking';
+      const closeSource = isInstagram ? 'Instagram Booking' : 'YouTube Booking';
       closeLead = await createCloseLead(
         { firstName, lastName, email, phone: '', budgetLabel: '', experience: '', situation: '' },
         closeSource
@@ -79,7 +79,7 @@ export default async function handler(req, res) {
     const opportunityId = myOpp.id;
 
     // ── 5. Update GHL contact tag to booked-call ──────────────────────────────
-    const sourceTags = isInstagram ? ['qualified', 'booked-call', 'instagram'] : ['qualified', 'booked-call', 'vsl'];
+    const sourceTags = isInstagram ? ['qualified', 'booked-call', 'instagram'] : ['qualified', 'booked-call', 'youtube'];
     await createGHLContact(
       { firstName, lastName, email, phone: '', budgetLabel: '', experience: '', situation: '' },
       sourceTags
@@ -117,7 +117,7 @@ export default async function handler(req, res) {
     // ── 6. Send Slack notification to #new-calls-booked ───────────────────────
     try {
       const slackEmoji = isInstagram ? '📱' : '🎥';
-      const slackSource = isInstagram ? 'Instagram' : 'VSL Funnel';
+      const slackSource = isInstagram ? 'Instagram' : 'YouTube';
       const slackMessage = `${slackEmoji} *New ${slackSource} Call Booked!*\n\n*Name:* ${inviteeName}\n*Email:* ${email}\n*Event:* ${eventNameFullName}\n*Start Time:* ${formattedStartTime}`;
 
       await sendSlackMessage(slackMessage, process.env.SLACK_CALLS_WEBHOOK_URL);
