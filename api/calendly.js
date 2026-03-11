@@ -1,4 +1,4 @@
-import { findCloseLeadByEmail, createCloseOpportunity, updateCloseLeadStatus, createCloseNote, findOpportunityByCalendlyUri } from '../lib/close.js';
+import { findCloseLeadByEmail, createCloseLead, createCloseOpportunity, updateCloseLeadStatus, createCloseNote, findOpportunityByCalendlyUri } from '../lib/close.js';
 import { createGHLContact } from '../lib/ghl.js';
 import { sendSlackMessage } from '../lib/slack.js';
 
@@ -26,6 +26,9 @@ export default async function handler(req, res) {
     const startTime = payload?.scheduled_event?.start_time ?? null;
     const eventName = payload?.scheduled_event?.name ?? 'Strategy Call';
 
+    const isInstagram = eventName.toLowerCase().includes('ig');
+    const source = isInstagram ? 'instagram' : 'vsl';
+
     if (!eventUri) return res.status(200).json({ ok: false, error: 'No event URI' });
 
     // ── 0. Instant Memory Lock (catches same-instance race conditions) ────────
@@ -45,12 +48,16 @@ export default async function handler(req, res) {
     console.log(`[calendly] Booking received for: ${email}`);
 
 
-    // ── 1. Find Close lead by email ───────────────────────────────────────────
-    const closeLead = await findCloseLeadByEmail(email);
+    // ── 1. Find Close lead by email (or create if new) ───────────────────────
+    let closeLead = await findCloseLeadByEmail(email);
 
     if (!closeLead) {
-      console.warn(`[calendly] No Close lead found for ${email}`);
-      return res.status(200).json({ ok: false, reason: 'No matching Close lead found', email });
+      console.log(`[calendly] No Close lead for ${email} — creating new lead (source: ${source})`);
+      const closeSource = isInstagram ? 'Instagram Booking' : 'VSL Booking';
+      closeLead = await createCloseLead(
+        { firstName, lastName, email, phone: '', budgetLabel: '', experience: '', situation: '' },
+        closeSource
+      );
     }
 
     // ── 2. Update lead status to CALL BOOKED ─────────────────────────────────
@@ -72,9 +79,10 @@ export default async function handler(req, res) {
     const opportunityId = myOpp.id;
 
     // ── 5. Update GHL contact tag to booked-call ──────────────────────────────
+    const sourceTags = isInstagram ? ['qualified', 'booked-call', 'instagram'] : ['qualified', 'booked-call', 'vsl'];
     await createGHLContact(
       { firstName, lastName, email, phone: '', budgetLabel: '', experience: '', situation: '' },
-      ['qualified', 'booked-call']
+      sourceTags
     );
 
     // ── 5. Create a note on the Close lead ────────────────────────────────────
@@ -108,7 +116,9 @@ export default async function handler(req, res) {
 
     // ── 6. Send Slack notification to #new-calls-booked ───────────────────────
     try {
-      const slackMessage = `📞 *New Call Booked!*\n\n*Name:* ${inviteeName}\n*Email:* ${email}\n*Event:* ${eventNameFullName}\n*Start Time:* ${formattedStartTime}`;
+      const slackEmoji = isInstagram ? '📱' : '🎥';
+      const slackSource = isInstagram ? 'Instagram' : 'VSL Funnel';
+      const slackMessage = `${slackEmoji} *New ${slackSource} Call Booked!*\n\n*Name:* ${inviteeName}\n*Email:* ${email}\n*Event:* ${eventNameFullName}\n*Start Time:* ${formattedStartTime}`;
 
       await sendSlackMessage(slackMessage, process.env.SLACK_CALLS_WEBHOOK_URL);
       console.log(`[calendly] Slack notification sent for ${email}`);
