@@ -20,8 +20,9 @@ export default async function handler(req, res) {
     }
 
     const email = payload?.email ?? null;
-    const firstName = payload?.first_name ?? '';
-    const lastName = payload?.last_name ?? '';
+    const fullName = payload?.name ?? '';
+    const firstName = payload?.first_name || fullName.split(' ')[0] || '';
+    const lastName = payload?.last_name || fullName.split(' ').slice(1).join(' ') || '';
     const eventUri = payload?.uri || payload?.event || '';
     const startTime = payload?.scheduled_event?.start_time ?? null;
     const eventName = payload?.scheduled_event?.name ?? 'Strategy Call';
