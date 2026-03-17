@@ -97,7 +97,7 @@ export default async function handler(req, res) {
         formattedStartTime = new Intl.DateTimeFormat('en-US', {
           hour: '2-digit', minute: '2-digit', hour12: true,
           weekday: 'long', month: 'long', day: 'numeric', year: 'numeric',
-          timeZoneName: 'short'
+          timeZoneName: 'short', timeZone: 'America/New_York'
         }).format(d).replace(/, /g, ' - ').replace('  ', ' '); // approximate target format
       }
     } catch (e) { }
