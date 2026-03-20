@@ -61,8 +61,8 @@ Answer: ${lead.experience || 'N/A'}
 2. What best describes where you are right now?
 Answer: ${lead.situation || 'N/A'}
 
-3. How much are you willing to invest right now?
-Answer: ${lead.willingness || lead.budgetLabel || 'N/A'}
+3. Investment Budget
+Answer: ${lead.budgetLabel || 'N/A'}
 
 Source: Typeform - Alex Ecoms VSL
 Submitted: ${lead.submittedAt || 'N/A'}`;
