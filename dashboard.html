@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alex Ecoms Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #0d1117; color: #e6edf3; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    /* HEADER */
+    .header { background: #161b22; border-bottom: 1px solid #30363d; padding: 0 24px; display: flex; align-items: center; gap: 32px; height: 56px; }
+    .header-title { font-weight: 700; font-size: 16px; color: #f97316; white-space: nowrap; }
+    .tabs { display: flex; gap: 0; }
+    .tab { padding: 0 20px; height: 56px; display: flex; align-items: center; font-size: 14px; font-weight: 500; color: #8b949e; cursor: pointer; border-bottom: 2px solid transparent; transition: all .2s; }
+    .tab:hover { color: #e6edf3; }
+    .tab.active { color: #f97316; border-bottom-color: #f97316; }
+    .refresh-info { margin-left: auto; font-size: 12px; color: #8b949e; }
+
+    /* FILTERS */
+    .filters { background: #161b22; border-bottom: 1px solid #30363d; padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+    .filter-group { display: flex; flex-direction: column; gap: 3px; }
+    .filter-label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: .5px; }
+    select, input[type="date"], input[type="text"] {
+      background: #0d1117; border: 1px solid #30363d; border-radius: 6px; color: #e6edf3;
+      font-size: 13px; padding: 6px 10px; outline: none; min-width: 140px;
+    }
+    select:focus, input:focus { border-color: #f97316; }
+    .btn-reset { background: #21262d; border: 1px solid #30363d; border-radius: 6px; color: #8b949e; font-size: 13px; padding: 6px 14px; cursor: pointer; height: 32px; transition: all .2s; }
+    .btn-reset:hover { border-color: #f97316; color: #f97316; }
+
+    /* CONTENT */
+    .content { padding: 20px 24px; }
+
+    /* METRIC CARDS */
+    .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 14px 16px; }
+    .card-label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 6px; }
+    .card-value { font-size: 22px; font-weight: 700; color: #e6edf3; }
+    .card-value.orange { color: #f97316; }
+    .card-value.green { color: #3fb950; }
+    .card-sub { font-size: 11px; color: #8b949e; margin-top: 4px; }
+
+    /* CHARTS */
+    .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    @media (max-width: 768px) { .charts-row { grid-template-columns: 1fr; } }
+    .chart-card { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; }
+    .chart-title { font-size: 13px; font-weight: 600; color: #e6edf3; margin-bottom: 12px; }
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* SCOREBOARD */
+    .section-title { font-size: 15px; font-weight: 700; color: #f97316; margin-bottom: 12px; text-align: center; }
+    .table-wrap { background: #161b22; border: 1px solid #30363d; border-radius: 8px; overflow: auto; margin-bottom: 20px; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    thead th { background: #21262d; color: #8b949e; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; padding: 10px 12px; text-align: left; white-space: nowrap; border-bottom: 1px solid #30363d; position: sticky; top: 0; }
+    tbody tr { border-bottom: 1px solid #21262d; transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #1c2128; }
+    tbody td { padding: 9px 12px; color: #e6edf3; white-space: nowrap; }
+    tbody td.green { color: #3fb950; font-weight: 600; }
+    tbody td.orange { color: #f97316; font-weight: 600; }
+    tbody td a { color: #58a6ff; text-decoration: none; font-size: 12px; }
+    tbody td a:hover { text-decoration: underline; }
+
+    /* SEARCH ROW */
+    .search-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; align-items: flex-end; }
+    .search-input { flex: 1; min-width: 180px; }
+    .search-input input { width: 100%; }
+
+    /* PAGINATION */
+    .pagination { display: flex; justify-content: flex-end; align-items: center; gap: 8px; padding: 10px 12px; font-size: 13px; color: #8b949e; border-top: 1px solid #30363d; }
+    .page-btn { background: #21262d; border: 1px solid #30363d; border-radius: 6px; color: #8b949e; font-size: 13px; padding: 4px 10px; cursor: pointer; }
+    .page-btn:hover:not(:disabled) { border-color: #f97316; color: #f97316; }
+    .page-btn:disabled { opacity: .4; cursor: default; }
+
+    /* LOADING */
+    .loading { display: flex; align-items: center; justify-content: center; padding: 60px; flex-direction: column; gap: 16px; color: #8b949e; font-size: 14px; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #30363d; border-top-color: #f97316; border-radius: 50%; animation: spin .8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .error-msg { background: #161b22; border: 1px solid #f85149; border-radius: 8px; padding: 16px 20px; color: #f85149; font-size: 14px; margin: 20px 0; }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-title">Alex Ecoms Dashboard</div>
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('closing')">Closing Team</div>
+    <div class="tab" onclick="switchTab('dm')">DM Setting Team</div>
+  </div>
+  <div class="refresh-info" id="lastRefresh"></div>
+</div>
+
+<!-- CLOSING TEAM FILTERS -->
+<div class="filters" id="closingFilters">
+  <div class="filter-group">
+    <div class="filter-label">Closer</div>
+    <select id="filterCloser" onchange="renderClosing()"><option value="">All Closers</option></select>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Setter</div>
+    <select id="filterSetter" onchange="renderClosing()"><option value="">All Setters</option></select>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Lead Source</div>
+    <select id="filterSource" onchange="renderClosing()"><option value="">All Sources</option></select>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Call Type</div>
+    <select id="filterCallType" onchange="renderClosing()"><option value="">All Types</option></select>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">From</div>
+    <input type="date" id="filterStartDate" onchange="renderClosing()" />
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">To</div>
+    <input type="date" id="filterEndDate" onchange="renderClosing()" />
+  </div>
+  <button class="btn-reset" onclick="resetClosingFilters()">Reset</button>
+</div>
+
+<!-- DM SETTING FILTERS -->
+<div class="filters hidden" id="dmFilters">
+  <div class="filter-group">
+    <div class="filter-label">Setter</div>
+    <select id="filterDmSetter" onchange="renderDM()"><option value="">All Setters</option></select>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">Setter Type</div>
+    <select id="filterSetterType" onchange="renderDM()"><option value="">All Types</option></select>
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">From</div>
+    <input type="date" id="filterDmStart" onchange="renderDM()" />
+  </div>
+  <div class="filter-group">
+    <div class="filter-label">To</div>
+    <input type="date" id="filterDmEnd" onchange="renderDM()" />
+  </div>
+  <button class="btn-reset" onclick="resetDMFilters()">Reset</button>
+</div>
+
+<div class="content" id="mainContent">
+  <div class="loading"><div class="spinner"></div>Loading dashboard data...</div>
+</div>
+
+<script>
+let allPCF = [];
+let allEOD = [];
+let activeTab = 'closing';
+let closingPage = 1;
+const PAGE_SIZE = 50;
+let charts = {};
+
+// ─── INIT ───────────────────────────────────────────────────────────────────
+async function init() {
+  try {
+    const res = await fetch('/api/sheets');
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    allPCF = data.pcf || [];
+    allEOD = data.eod || [];
+    document.getElementById('lastRefresh').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    populateFilters();
+    setDefaultDates();
+    renderClosing();
+  } catch (err) {
+    document.getElementById('mainContent').innerHTML =
+      `<div class="error-msg">⚠ Failed to load data: ${err.message}<br><br>Make sure your environment variables are set (GOOGLE_SERVICE_ACCOUNT_EMAIL, GOOGLE_PRIVATE_KEY, PCF_SPREADSHEET_ID, EOD_SPREADSHEET_ID).</div>`;
+  }
+}
+
+function populateFilters() {
+  const closers = [...new Set(allPCF.map(r => r['Closer']).filter(Boolean))].sort();
+  const setters = [...new Set(allPCF.map(r => r['Setter']).filter(Boolean))].sort();
+  const sources = [...new Set(allPCF.map(r => r['Lead Source']).filter(Boolean))].sort();
+  const callTypes = [...new Set(allPCF.map(r => r['Call Type']).filter(Boolean))].sort();
+  const dmSetters = [...new Set(allEOD.map(r => r['Setter']).filter(Boolean))].sort();
+  const setterTypes = [...new Set(allEOD.map(r => r['Setter Type']).filter(Boolean))].sort();
+
+  fillSelect('filterCloser', closers, 'All Closers');
+  fillSelect('filterSetter', setters, 'All Setters');
+  fillSelect('filterSource', sources, 'All Sources');
+  fillSelect('filterCallType', callTypes, 'All Types');
+  fillSelect('filterDmSetter', dmSetters, 'All Setters');
+  fillSelect('filterSetterType', setterTypes, 'All Types');
+}
+
+function fillSelect(id, options, placeholder) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = `<option value="">${placeholder}</option>` +
+    options.map(o => `<option value="${o}">${o}</option>`).join('');
+}
+
+function setDefaultDates() {
+  const now = new Date();
+  const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0');
+  const start = `${y}-${m}-01`;
+  const end = now.toISOString().split('T')[0];
+  document.getElementById('filterStartDate').value = start;
+  document.getElementById('filterEndDate').value = end;
+  document.getElementById('filterDmStart').value = start;
+  document.getElementById('filterDmEnd').value = end;
+}
+
+// ─── TAB SWITCHING ───────────────────────────────────────────────────────────
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab').forEach((el, i) => el.classList.toggle('active', (i === 0) === (tab === 'closing')));
+  document.getElementById('closingFilters').classList.toggle('hidden', tab !== 'closing');
+  document.getElementById('dmFilters').classList.toggle('hidden', tab !== 'dm');
+  destroyCharts();
+  if (tab === 'closing') renderClosing();
+  else renderDM();
+}
+
+function destroyCharts() {
+  Object.values(charts).forEach(c => c.destroy());
+  charts = {};
+}
+
+// ─── FILTERS ─────────────────────────────────────────────────────────────────
+function getClosingFiltered() {
+  const closer = document.getElementById('filterCloser').value;
+  const setter = document.getElementById('filterSetter').value;
+  const source = document.getElementById('filterSource').value;
+  const callType = document.getElementById('filterCallType').value;
+  const start = document.getElementById('filterStartDate').value;
+  const end = document.getElementById('filterEndDate').value;
+  const searchName = document.getElementById('searchName')?.value.toLowerCase() || '';
+  const searchEmail = document.getElementById('searchEmail')?.value.toLowerCase() || '';
+
+  return allPCF.filter(r => {
+    if (closer && r['Closer'] !== closer) return false;
+    if (setter && r['Setter'] !== setter) return false;
+    if (source && r['Lead Source'] !== source) return false;
+    if (callType && r['Call Type'] !== callType) return false;
+    const callDate = r['Call Date'] ? new Date(r['Call Date']) : null;
+    if (start && callDate && callDate < new Date(start)) return false;
+    if (end && callDate && callDate > new Date(end + 'T23:59:59')) return false;
+    if (searchName && !r['Lead Name']?.toLowerCase().includes(searchName)) return false;
+    if (searchEmail && !r['Lead Email']?.toLowerCase().includes(searchEmail)) return false;
+    return true;
+  });
+}
+
+function getDMFiltered() {
+  const setter = document.getElementById('filterDmSetter').value;
+  const type = document.getElementById('filterSetterType').value;
+  const start = document.getElementById('filterDmStart').value;
+  const end = document.getElementById('filterDmEnd').value;
+
+  return allEOD.filter(r => {
+    if (setter && r['Setter'] !== setter) return false;
+    if (type && r['Setter Type'] !== type) return false;
+    const d = r['Date of Reporting'] ? new Date(r['Date of Reporting']) : null;
+    if (start && d && d < new Date(start)) return false;
+    if (end && d && d > new Date(end + 'T23:59:59')) return false;
+    return true;
+  });
+}
+
+function resetClosingFilters() {
+  ['filterCloser','filterSetter','filterSource','filterCallType'].forEach(id => document.getElementById(id).value = '');
+  setDefaultDates();
+  renderClosing();
+}
+
+function resetDMFilters() {
+  ['filterDmSetter','filterSetterType'].forEach(id => document.getElementById(id).value = '');
+  setDefaultDates();
+  renderDM();
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+const num = v => parseFloat(v) || 0;
+const pct = (a, b) => b > 0 ? (a / b * 100).toFixed(1) + '%' : '0%';
+const dollar = v => '$' + num(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const isShowed = r => (r['Call Status'] || '').toLowerCase() === 'showed';
+const isNoShow = r => (r['Call Status'] || '').toLowerCase() === 'no show';
+const isCancelled = r => (r['Call Status'] || '').toLowerCase() === 'cancelled';
+const isRescheduled = r => (r['Call Status'] || '').toLowerCase() === 'rescheduled';
+const isClosedWon = r => num(r['Cash Collected']) > 0;
+const payType = (r, t) => (r['Payment Type'] || '').toUpperCase() === t.toUpperCase();
+
+// ─── CLOSING TEAM RENDER ─────────────────────────────────────────────────────
+function renderClosing() {
+  closingPage = 1;
+  const data = getClosingFiltered();
+
+  const callsOnCal = data.length;
+  const noShow = data.filter(isNoShow).length;
+  const liveCalls = data.filter(isShowed).length;
+  const cancelled = data.filter(isCancelled).length;
+  const rescheduled = data.filter(isRescheduled).length;
+  const closedWon = data.filter(isClosedWon).length;
+  const pifs = data.filter(r => payType(r, 'PIF')).length;
+  const splits = data.filter(r => payType(r, 'SPLIT')).length;
+  const deposits = data.filter(r => payType(r, 'DEPOSIT')).length;
+  const renewals = data.filter(r => (r['Call Type'] || '').toLowerCase().includes('renewal')).length;
+  const renewalsCash = data.filter(r => (r['Call Type'] || '').toLowerCase().includes('renewal')).reduce((s, r) => s + num(r['Cash Collected']), 0);
+  const cashCollected = data.reduce((s, r) => s + num(r['Cash Collected']), 0);
+  const revenue = data.reduce((s, r) => s + num(r['Revenue']), 0);
+
+  const showRate = pct(liveCalls, callsOnCal);
+  const closeRate = pct(closedWon, liveCalls);
+  const pitchRate = pct(liveCalls, callsOnCal);
+  const ccPerBooked = callsOnCal > 0 ? cashCollected / callsOnCal : 0;
+  const cashPerLive = liveCalls > 0 ? cashCollected / liveCalls : 0;
+  const aov = closedWon > 0 ? revenue / closedWon : 0;
+
+  // days in range
+  const start = document.getElementById('filterStartDate').value;
+  const end = document.getElementById('filterEndDate').value;
+  const days = start && end ? Math.max(1, Math.ceil((new Date(end) - new Date(start)) / 86400000) + 1) : 30;
+  const cashPerDay = cashCollected / days;
+
+  // Scoreboard grouped by closer
+  const byCloser = {};
+  data.forEach(r => {
+    const c = r['Closer'] || 'Unknown';
+    if (!byCloser[c]) byCloser[c] = [];
+    byCloser[c].push(r);
+  });
+
+  // No-close reasons
+  const reasons = {};
+  data.forEach(r => {
+    const reason = r['Offered No Close Reason'];
+    if (reason) reasons[reason] = (reasons[reason] || 0) + 1;
+  });
+
+  // Show rate by day of week
+  const dayNames = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const byDay = Array(7).fill(null).map(() => ({ showed: 0, total: 0 }));
+  data.forEach(r => {
+    if (r['Call Date']) {
+      const d = new Date(r['Call Date']).getDay();
+      byDay[d].total++;
+      if (isShowed(r)) byDay[d].showed++;
+    }
+  });
+
+  // Cash by date
+  const cashByDate = {};
+  data.forEach(r => {
+    const d = r['Call Date']?.split('T')[0] || r['Call Date'];
+    if (d) cashByDate[d] = (cashByDate[d] || 0) + num(r['Cash Collected']);
+  });
+  const sortedDates = Object.keys(cashByDate).sort();
+
+  destroyCharts();
+
+  document.getElementById('mainContent').innerHTML = `
+    <!-- METRIC CARDS ROW 1 -->
+    <div class="cards-grid">
+      ${card('Calls on Calendar', callsOnCal)}
+      ${card('No Show', noShow)}
+      ${card('Live Calls', liveCalls)}
+      ${card('Calls Pitched', liveCalls)}
+      ${card('Show Rate', showRate, 'orange')}
+      ${card('Close Rate', closeRate, 'green')}
+      ${card('Cash Collected', dollar(cashCollected), 'orange')}
+      ${card('Revenue', dollar(revenue))}
+    </div>
+    <!-- METRIC CARDS ROW 2 -->
+    <div class="cards-grid">
+      ${card('Pitch Rate', pitchRate)}
+      ${card('Closed Won', closedWon, 'green')}
+      ${card('PIFs', pifs)}
+      ${card('Renewals CC', dollar(renewalsCash))}
+      ${card('CC / Booked Call', dollar(ccPerBooked))}
+      ${card('Cash / Live Call', dollar(cashPerLive))}
+      ${card('AOV', dollar(aov))}
+      ${card('Cash / Day', dollar(cashPerDay))}
+    </div>
+    <!-- METRIC CARDS ROW 3 -->
+    <div class="cards-grid">
+      ${card('Cancelled', cancelled)}
+      ${card('Rescheduled', rescheduled)}
+      ${card('Renewals', renewals)}
+      ${card('Splits', splits)}
+      ${card('Deposits', deposits)}
+    </div>
+
+    <!-- CHARTS -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Cash Collected by Date</div>
+        <div class="chart-wrap"><canvas id="cashChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Show Rate by Day of Week</div>
+        <div class="chart-wrap"><canvas id="showRateChart"></canvas></div>
+      </div>
+    </div>
+    ${Object.keys(reasons).length > 0 ? `
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Offered No Close — Reason</div>
+        <div class="chart-wrap"><canvas id="noCloseChart"></canvas></div>
+      </div>
+      <div class="chart-card"></div>
+    </div>` : ''}
+
+    <!-- SCOREBOARD -->
+    <div class="section-title">🏆 SCOREBOARD 🏆</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Closer</th><th>Calls on Cal</th><th>Live</th><th>No Show</th>
+          <th>Cancelled</th><th>Show Rate</th><th>Close Rate</th><th>Closed Won</th>
+          <th>PIFs</th><th>Splits</th><th>Deposits</th><th>AOV</th><th>Cash Collected</th>
+        </tr></thead>
+        <tbody>
+        ${Object.entries(byCloser).sort((a,b) => {
+          const ccA = a[1].reduce((s,r) => s + num(r['Cash Collected']), 0);
+          const ccB = b[1].reduce((s,r) => s + num(r['Cash Collected']), 0);
+          return ccB - ccA;
+        }).map(([closer, rows], i) => {
+          const cLive = rows.filter(isShowed).length;
+          const cWon = rows.filter(isClosedWon).length;
+          const cCash = rows.reduce((s,r) => s + num(r['Cash Collected']), 0);
+          const cRev = rows.reduce((s,r) => s + num(r['Revenue']), 0);
+          const cAov = cWon > 0 ? cRev / cWon : 0;
+          return `<tr>
+            <td>${i+1}</td>
+            <td><b>${closer}</b></td>
+            <td>${rows.length}</td>
+            <td>${cLive}</td>
+            <td>${rows.filter(isNoShow).length}</td>
+            <td>${rows.filter(isCancelled).length}</td>
+            <td>${pct(cLive, rows.length)}</td>
+            <td>${pct(cWon, cLive)}</td>
+            <td class="green">${cWon}</td>
+            <td>${rows.filter(r => payType(r,'PIF')).length}</td>
+            <td>${rows.filter(r => payType(r,'SPLIT')).length}</td>
+            <td>${rows.filter(r => payType(r,'DEPOSIT')).length}</td>
+            <td>${dollar(cAov)}</td>
+            <td class="orange">${dollar(cCash)}</td>
+          </tr>`;
+        }).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SEARCH + DATA TABLE -->
+    <div class="search-row">
+      <div class="search-input filter-group">
+        <div class="filter-label">Search Lead Name</div>
+        <input type="text" id="searchName" placeholder="Enter a value..." oninput="renderClosingTable()" />
+      </div>
+      <div class="search-input filter-group">
+        <div class="filter-label">Search Lead Email</div>
+        <input type="text" id="searchEmail" placeholder="Enter a value..." oninput="renderClosingTable()" />
+      </div>
+    </div>
+    <div id="closingTableWrap" class="table-wrap">
+      <div id="closingTableBody"></div>
+    </div>
+  `;
+
+  renderClosingTable();
+  buildCashChart(sortedDates, cashByDate);
+  buildShowRateChart(dayNames, byDay);
+  if (Object.keys(reasons).length > 0) buildNoCloseChart(reasons);
+}
+
+function renderClosingTable() {
+  const data = getClosingFiltered();
+  const total = data.length;
+  const start = (closingPage - 1) * PAGE_SIZE;
+  const pageData = data.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('closingTableWrap').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>Call Date</th><th>Lead Name</th><th>Lead Email</th><th>Closer</th><th>Setter</th>
+        <th>Lead Source</th><th>Call Type</th><th>Call Status</th><th>Payment Type</th>
+        <th>Fathom Recording</th><th>Revenue</th><th>Cash Collected</th>
+      </tr></thead>
+      <tbody>
+      ${pageData.map(r => `<tr>
+        <td>${r['Call Date'] || '-'}</td>
+        <td>${r['Lead Name'] || '-'}</td>
+        <td>${r['Lead Email'] || '-'}</td>
+        <td>${r['Closer'] || '-'}</td>
+        <td>${r['Setter'] || '-'}</td>
+        <td>${r['Lead Source'] || '-'}</td>
+        <td>${r['Call Type'] || '-'}</td>
+        <td>${r['Call Status'] || '-'}</td>
+        <td>${r['Payment Type'] || '-'}</td>
+        <td>${r['Fathom Recording'] ? `<a href="${r['Fathom Recording']}" target="_blank">View</a>` : '-'}</td>
+        <td>${r['Revenue'] ? dollar(r['Revenue']) : '-'}</td>
+        <td class="${num(r['Cash Collected']) > 0 ? 'orange' : ''}">${r['Cash Collected'] ? dollar(r['Cash Collected']) : '-'}</td>
+      </tr>`).join('')}
+      </tbody>
+    </table>
+    <div class="pagination">
+      <span>${total} rows</span>
+      <button class="page-btn" onclick="changePage(-1)" ${closingPage <= 1 ? 'disabled' : ''}>← Prev</button>
+      <span>Page ${closingPage} of ${Math.max(1, Math.ceil(total / PAGE_SIZE))}</span>
+      <button class="page-btn" onclick="changePage(1)" ${start + PAGE_SIZE >= total ? 'disabled' : ''}>Next →</button>
+    </div>
+  `;
+}
+
+function changePage(dir) {
+  closingPage += dir;
+  renderClosingTable();
+  window.scrollTo(0, document.getElementById('closingTableWrap').offsetTop - 80);
+}
+
+// ─── DM SETTING TEAM RENDER ──────────────────────────────────────────────────
+function renderDM() {
+  const eod = getDMFiltered();
+
+  const dmsTotal = eod.reduce((s, r) => s + num(r['New DMs Assigned']), 0);
+  const linksTotal = eod.reduce((s, r) => s + num(r['Booking Links Sent']), 0);
+  const callsBooked = eod.reduce((s, r) => s + num(r['Number of Calls Booked']), 0);
+  const callsOnCal = eod.reduce((s, r) => s + num(r['Booked Calls on Calendar']), 0);
+  const setsShowed = eod.reduce((s, r) => s + num(r['Sets Showed']), 0);
+  const setsNoShow = eod.reduce((s, r) => s + num(r['Set No Showed']), 0);
+
+  const dmToLinkRate = pct(linksTotal, dmsTotal);
+  const bookRate = pct(callsBooked, linksTotal);
+  const showRate = pct(setsShowed, callsBooked);
+
+  // Cross-ref PCF for cash metrics (filter by setter if selected)
+  const dmSetterFilter = document.getElementById('filterDmSetter').value;
+  const dmStart = document.getElementById('filterDmStart').value;
+  const dmEnd = document.getElementById('filterDmEnd').value;
+
+  const pcfForSetters = allPCF.filter(r => {
+    if (dmSetterFilter && r['Setter'] !== dmSetterFilter) return false;
+    const d = r['Call Date'] ? new Date(r['Call Date']) : null;
+    if (dmStart && d && d < new Date(dmStart)) return false;
+    if (dmEnd && d && d > new Date(dmEnd + 'T23:59:59')) return false;
+    return true;
+  });
+
+  const cashCollected = pcfForSetters.reduce((s, r) => s + num(r['Cash Collected']), 0);
+  const revenue = pcfForSetters.reduce((s, r) => s + num(r['Revenue']), 0);
+  const closedWon = pcfForSetters.filter(isClosedWon).length;
+  const closeRate = pct(closedWon, pcfForSetters.filter(isShowed).length);
+  const aov = closedWon > 0 ? revenue / closedWon : 0;
+  const ccPerBook = callsBooked > 0 ? cashCollected / callsBooked : 0;
+  const cashPerLive = setsShowed > 0 ? cashCollected / setsShowed : 0;
+
+  const days = (() => {
+    const s = document.getElementById('filterDmStart').value;
+    const e = document.getElementById('filterDmEnd').value;
+    return s && e ? Math.max(1, Math.ceil((new Date(e) - new Date(s)) / 86400000) + 1) : 30;
+  })();
+  const cashPerDay = cashCollected / days;
+
+  // Scoreboard by setter
+  const setterNames = [...new Set(eod.map(r => r['Setter']).filter(Boolean))];
+  const setterScores = setterNames.map(name => {
+    const rows = eod.filter(r => r['Setter'] === name);
+    const pcfRows = allPCF.filter(r => r['Setter'] === name);
+    return {
+      name,
+      dms: rows.reduce((s, r) => s + num(r['New DMs Assigned']), 0),
+      links: rows.reduce((s, r) => s + num(r['Booking Links Sent']), 0),
+      booked: rows.reduce((s, r) => s + num(r['Number of Calls Booked']), 0),
+      live: rows.reduce((s, r) => s + num(r['Sets Showed']), 0),
+      noShow: rows.reduce((s, r) => s + num(r['Set No Showed']), 0),
+      closedWon: pcfRows.filter(isClosedWon).length,
+      cash: pcfRows.reduce((s, r) => s + num(r['Cash Collected']), 0),
+    };
+  }).sort((a, b) => b.cash - a.cash);
+
+  // Booked calls by setter over time
+  const bookingDates = [...new Set(eod.map(r => r['Date of Reporting']?.split('T')[0]).filter(Boolean))].sort();
+  const setterBookings = setterNames.map(name => ({
+    name,
+    data: bookingDates.map(d => {
+      const row = eod.find(r => r['Setter'] === name && r['Date of Reporting']?.startsWith(d));
+      return row ? num(row['Number of Calls Booked']) : 0;
+    })
+  }));
+
+  // Cash by setter (pie)
+  const cashBySetter = setterNames.map(name => ({
+    name,
+    cash: allPCF.filter(r => r['Setter'] === name).reduce((s, r) => s + num(r['Cash Collected']), 0)
+  })).filter(s => s.cash > 0);
+
+  // Setter payments from PCF
+  const setterPayments = pcfForSetters.filter(r => num(r['Cash Collected']) > 0).slice(0, 100);
+
+  destroyCharts();
+
+  document.getElementById('mainContent').innerHTML = `
+    <!-- DM METRICS ROW 1 -->
+    <div class="cards-grid">
+      ${card('Calls on Cal', callsOnCal)}
+      ${card('DMs Sent', dmsTotal)}
+      ${card('Links Sent', linksTotal)}
+      ${card('DM-to-Link Rate', dmToLinkRate, 'orange')}
+      ${card('Book Rate', bookRate, 'orange')}
+      ${card('No Show', setsNoShow)}
+      ${card('Live Calls', setsShowed)}
+      ${card('Cash Collected', dollar(cashCollected), 'orange')}
+    </div>
+    <!-- DM METRICS ROW 2 -->
+    <div class="cards-grid">
+      ${card('Closed Won', closedWon, 'green')}
+      ${card('Show Rate', showRate)}
+      ${card('Close Rate', closeRate, 'green')}
+      ${card('CC / Book Call', dollar(ccPerBook))}
+      ${card('CC / Day', dollar(cashPerDay))}
+      ${card('Cash / Live Call', dollar(cashPerLive))}
+      ${card('AOV', dollar(aov))}
+      ${card('Calls Booked', callsBooked)}
+    </div>
+
+    <!-- CHARTS -->
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">Booked Calls by Setter</div>
+        <div class="chart-wrap"><canvas id="bookingsChart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Cash Collected by Setter</div>
+        <div class="chart-wrap"><canvas id="cashSetterChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- SCOREBOARD -->
+    <div class="section-title">🏆 SCOREBOARD 🏆</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>#</th><th>Setter</th><th>DMs Sent</th><th>Links Sent</th><th>Calls Booked</th>
+          <th>Live Show</th><th>No Show</th><th>Closed Won</th><th>Cash Collected</th>
+        </tr></thead>
+        <tbody>
+        ${setterScores.map((s, i) => `<tr>
+          <td>${i+1}</td>
+          <td><b>${s.name}</b></td>
+          <td>${s.dms}</td>
+          <td>${s.links}</td>
+          <td>${s.booked}</td>
+          <td>${s.live}</td>
+          <td>${s.noShow}</td>
+          <td class="green">${s.closedWon}</td>
+          <td class="orange">${dollar(s.cash)}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- SETTER PAYMENTS -->
+    <div class="section-title" style="text-align:left;font-size:14px;margin-bottom:8px">Setter Payments</div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>
+          <th>Call Date</th><th>Lead Email</th><th>Closer</th><th>Setter</th>
+          <th>Call Type</th><th>Payment Type</th><th>Cash Collected</th>
+        </tr></thead>
+        <tbody>
+        ${setterPayments.map(r => `<tr>
+          <td>${r['Call Date'] || '-'}</td>
+          <td>${r['Lead Email'] || '-'}</td>
+          <td>${r['Closer'] || '-'}</td>
+          <td>${r['Setter'] || '-'}</td>
+          <td>${r['Call Type'] || '-'}</td>
+          <td>${r['Payment Type'] || '-'}</td>
+          <td class="orange">${dollar(r['Cash Collected'])}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  buildBookingsChart(bookingDates, setterBookings);
+  buildCashSetterPie(cashBySetter);
+}
+
+// ─── CARD HELPER ─────────────────────────────────────────────────────────────
+function card(label, value, color = '') {
+  return `<div class="card">
+    <div class="card-label">${label}</div>
+    <div class="card-value ${color}">${value}</div>
+  </div>`;
+}
+
+// ─── CHARTS ──────────────────────────────────────────────────────────────────
+const COLORS = ['#f97316','#3b82f6','#10b981','#a855f7','#ec4899','#eab308','#06b6d4','#ef4444'];
+
+function chartDefaults() {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false }, tooltip: { backgroundColor: '#1c2128', titleColor: '#e6edf3', bodyColor: '#8b949e' } },
+    scales: {
+      x: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 11 } } },
+      y: { grid: { color: '#21262d' }, ticks: { color: '#8b949e', font: { size: 11 } } }
+    }
+  };
+}
+
+function buildCashChart(dates, cashByDate) {
+  const ctx = document.getElementById('cashChart')?.getContext('2d');
+  if (!ctx || dates.length === 0) return;
+  charts.cash = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: dates.map(d => d.slice(5)),
+      datasets: [{ label: 'Cash Collected', data: dates.map(d => cashByDate[d] || 0), backgroundColor: '#f97316', borderRadius: 4 }]
+    },
+    options: { ...chartDefaults(), plugins: { ...chartDefaults().plugins, legend: { display: true, labels: { color: '#8b949e', font: { size: 12 } } } } }
+  });
+}
+
+function buildShowRateChart(dayNames, byDay) {
+  const ctx = document.getElementById('showRateChart')?.getContext('2d');
+  if (!ctx) return;
+  charts.showRate = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: dayNames,
+      datasets: [{ label: 'Show Rate %', data: byDay.map(d => d.total > 0 ? +(d.showed / d.total * 100).toFixed(1) : 0), backgroundColor: '#3b82f6', borderRadius: 4 }]
+    },
+    options: { ...chartDefaults(), scales: { ...chartDefaults().scales, y: { ...chartDefaults().scales.y, max: 100 } } }
+  });
+}
+
+function buildNoCloseChart(reasons) {
+  const ctx = document.getElementById('noCloseChart')?.getContext('2d');
+  if (!ctx) return;
+  const labels = Object.keys(reasons);
+  charts.noClose = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{ data: labels.map(l => reasons[l]), backgroundColor: '#3b82f6', borderRadius: 4 }]
+    },
+    options: chartDefaults()
+  });
+}
+
+function buildBookingsChart(dates, setterBookings) {
+  const ctx = document.getElementById('bookingsChart')?.getContext('2d');
+  if (!ctx || dates.length === 0) return;
+  charts.bookings = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: dates.map(d => d.slice(5)),
+      datasets: setterBookings.map((s, i) => ({
+        label: s.name, data: s.data, backgroundColor: COLORS[i % COLORS.length], borderRadius: 2
+      }))
+    },
+    options: { ...chartDefaults(), plugins: { ...chartDefaults().plugins, legend: { display: true, labels: { color: '#8b949e', font: { size: 11 } } } }, scales: { ...chartDefaults().scales, x: { ...chartDefaults().scales.x, stacked: true }, y: { ...chartDefaults().scales.y, stacked: true } } }
+  });
+}
+
+function buildCashSetterPie(cashBySetter) {
+  const ctx = document.getElementById('cashSetterChart')?.getContext('2d');
+  if (!ctx || cashBySetter.length === 0) return;
+  charts.cashSetter = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: cashBySetter.map(s => s.name),
+      datasets: [{ data: cashBySetter.map(s => s.cash), backgroundColor: COLORS, borderColor: '#0d1117', borderWidth: 2 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: true, position: 'right', labels: { color: '#8b949e', font: { size: 12 } } }, tooltip: { backgroundColor: '#1c2128', titleColor: '#e6edf3', bodyColor: '#8b949e' } }
+    }
+  });
+}
+
+// ─── AUTO REFRESH ────────────────────────────────────────────────────────────
+setInterval(async () => {
+  try {
+    const res = await fetch('/api/sheets');
+    const data = await res.json();
+    if (data.pcf) allPCF = data.pcf;
+    if (data.eod) allEOD = data.eod;
+    populateFilters();
+    document.getElementById('lastRefresh').textContent = `Updated ${new Date().toLocaleTimeString()}`;
+    if (activeTab === 'closing') renderClosing();
+    else renderDM();
+  } catch (e) { /* silent refresh failure */ }
+}, 60000);
+
+// ─── START ───────────────────────────────────────────────────────────────────
+init();
+</script>
+</body>
+</html>
