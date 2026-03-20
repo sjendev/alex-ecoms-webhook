@@ -242,9 +242,9 @@ function getClosingFiltered() {
     if (setter && r['Setter'] !== setter) return false;
     if (source && r['Lead Source'] !== source) return false;
     if (callType && r['Call Type'] !== callType) return false;
-    const callDate = r['Call Date'] ? new Date(r['Call Date']) : null;
-    if (start && callDate && callDate < new Date(start)) return false;
-    if (end && callDate && callDate > new Date(end + 'T23:59:59')) return false;
+    const callDate = parseDate(r['Call Date']);
+    if (start && callDate && callDate < parseDate(start)) return false;
+    if (end && callDate && callDate > parseDate(end)) return false;
     if (searchName && !r['Lead Name']?.toLowerCase().includes(searchName)) return false;
     if (searchEmail && !r['Lead Email']?.toLowerCase().includes(searchEmail)) return false;
     return true;
@@ -260,9 +260,9 @@ function getDMFiltered() {
   return allEOD.filter(r => {
     if (setter && r['Setter'] !== setter) return false;
     if (type && r['Setter Type'] !== type) return false;
-    const d = r['Date of Reporting'] ? new Date(r['Date of Reporting']) : null;
-    if (start && d && d < new Date(start)) return false;
-    if (end && d && d > new Date(end + 'T23:59:59')) return false;
+    const d = parseDate(r['Date of Reporting']);
+    if (start && d && d < parseDate(start)) return false;
+    if (end && d && d > parseDate(end)) return false;
     return true;
   });
 }
@@ -280,6 +280,15 @@ function resetDMFilters() {
 }
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
+function parseDate(str) {
+  if (!str) return null;
+  const mdy = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (mdy) return new Date(+mdy[3], +mdy[1] - 1, +mdy[2]);
+  const ymd = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (ymd) return new Date(+ymd[1], +ymd[2] - 1, +ymd[3]);
+  return null;
+}
+
 const num = v => parseFloat(v) || 0;
 const pct = (a, b) => b > 0 ? (a / b * 100).toFixed(1) + '%' : '0%';
 const dollar = v => '$' + num(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -540,9 +549,9 @@ function renderDM() {
 
   const pcfForSetters = allPCF.filter(r => {
     if (dmSetterFilter && r['Setter'] !== dmSetterFilter) return false;
-    const d = r['Call Date'] ? new Date(r['Call Date']) : null;
-    if (dmStart && d && d < new Date(dmStart)) return false;
-    if (dmEnd && d && d > new Date(dmEnd + 'T23:59:59')) return false;
+    const d = parseDate(r['Call Date']);
+    if (dmStart && d && d < parseDate(dmStart)) return false;
+    if (dmEnd && d && d > parseDate(dmEnd)) return false;
     return true;
   });
 
