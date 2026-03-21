@@ -9,6 +9,12 @@ Vercel serverless webhook system routing Typeform leads → GHL + Close.com, and
 - Typeform disqualified → GHL contact only
 - Calendly booking → Close status → CALL BOOKED + opportunity + note with Zoom link
 
+## Calendly Links
+- IG: `https://calendly.com/riley-alexecomsales/strategy-session-ig`
+- YT: `https://calendly.com/riley-alexecomsales/30min`
+
+Detection in `api/calendly.js` uses `eventName.toLowerCase().includes('ig')` — IG events must have "ig" in the Calendly event type name.
+
 ## Key IDs
 - GHL Location: `vQF42dKTFoRn30T8YNse`
 - Qualified pipeline: `Or6oHwwuXmA3jnCrUCWS`
