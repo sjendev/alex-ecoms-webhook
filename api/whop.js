@@ -7,38 +7,47 @@ export default async function handler(req, res) {
 
     try {
         const body = req.body;
-        const event = body.event || body.action || '';
+        const data = body.data || {};
 
-        // Accept both V1 (underscore) and V2+ (dot) event naming
-        const isPaymentSuccess = ['payment.succeeded', 'payment_succeeded'].includes(event);
+        // Log full payload for debugging
+        console.log('[whop] Full payload:', JSON.stringify(body).slice(0, 2000));
 
-        if (!isPaymentSuccess) {
-            console.log('[whop] Ignoring event:', event);
+        // Whop doesn't send an event field — the webhook subscription type
+        // determines what events arrive. Check for payment data.
+        const isPayment = data.id?.startsWith('pay_') || data.substatus === 'succeeded';
+
+        if (!isPayment) {
+            console.log('[whop] Ignoring non-payment webhook');
             return res.status(200).json({ ok: true, skipped: true });
         }
 
-        const data = body.data || {};
-        const amount = data.final_amount ?? data.amount ?? 0;
+        const amount = data.total ?? data.usd_total ?? data.final_amount ?? data.amount ?? 0;
         const currency = (data.currency || 'USD').toUpperCase();
-        const customerEmail = data.customer_email || data.user?.email || 'Unknown';
-        const customerName = data.customer_name || data.user?.name || '';
-        const productName = data.product?.name || data.plan?.product?.name || data.membership?.product?.name || 'N/A';
+        const customerEmail = data.user?.email || data.membership?.user?.email || 'Unknown';
+        const customerName = data.user?.name || data.user?.username || '';
+        const productName = data.product?.title || data.product?.name || 'N/A';
         const paymentId = data.id || body.id || 'N/A';
-        const createdAt = data.created_at || body.created_at || new Date().toISOString();
+        const createdAt = data.paid_at || data.created_at || body.timestamp || new Date().toISOString();
 
-        // Format amount (Whop sends cents)
-        const formattedAmount = (amount / 100).toLocaleString('en-US', {
+        // Format amount (Whop sends dollars, not cents)
+        const formattedAmount = Number(amount).toLocaleString('en-US', {
             style: 'currency',
             currency: currency,
         });
 
-        const message = `💰 *New Payment Received!*
+        const blocks = [
+            { type: 'header', text: { type: 'plain_text', text: '💰 New Payment Received!' } },
+            { type: 'section', fields: [
+                { type: 'mrkdwn', text: `*Name:*\n${customerName || 'N/A'}` },
+                { type: 'mrkdwn', text: `*Email:*\n${customerEmail}` },
+                { type: 'mrkdwn', text: `*Amount:*\n${formattedAmount}` },
+                { type: 'mrkdwn', text: `*Product:*\n${productName}` },
+            ]},
+            { type: 'image', image_url: 'https://alex-ecoms-webhook.vercel.app/takemymoney-leo.gif', alt_text: 'Take my money' },
+        ];
 
-*Name:* ${customerName || 'N/A'}
-*Email:* ${customerEmail}
-*Amount:* ${formattedAmount}`;
-
-        await sendSlackMessage(message);
+        const text = `💰 New Payment: ${formattedAmount} from ${customerEmail}`;
+        await sendSlackMessage(text, null, blocks);
 
         console.log(`[whop] Payment notification sent to Slack: ${formattedAmount} from ${customerEmail}`);
         return res.status(200).json({ ok: true });
