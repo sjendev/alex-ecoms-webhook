@@ -289,7 +289,7 @@ function parseDate(str) {
   return null;
 }
 
-const num = v => parseFloat(v) || 0;
+const num = v => parseFloat(String(v || '').replace(/[$,]/g, '')) || 0;
 const pct = (a, b) => b > 0 ? (a / b * 100).toFixed(1) + '%' : '0%';
 const dollar = v => '$' + num(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const isShowed = r => (r['Call Status'] || '').toLowerCase() === 'showed';
