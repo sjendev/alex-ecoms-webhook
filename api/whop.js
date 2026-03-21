@@ -25,7 +25,7 @@ export default async function handler(req, res) {
         const currency = (data.currency || 'USD').toUpperCase();
         const customerEmail = data.user?.email || data.membership?.user?.email || 'Unknown';
         const customerName = data.user?.name || data.user?.username || '';
-        const productName = data.product?.title || data.product?.name || 'N/A';
+
         const paymentId = data.id || body.id || 'N/A';
         const createdAt = data.paid_at || data.created_at || body.timestamp || new Date().toISOString();
 
@@ -41,7 +41,6 @@ export default async function handler(req, res) {
                 { type: 'mrkdwn', text: `*Name:*\n${customerName || 'N/A'}` },
                 { type: 'mrkdwn', text: `*Email:*\n${customerEmail}` },
                 { type: 'mrkdwn', text: `*Amount:*\n${formattedAmount}` },
-                { type: 'mrkdwn', text: `*Product:*\n${productName}` },
             ]},
             { type: 'image', image_url: 'https://alex-ecoms-webhook.vercel.app/takemymoney-leo.gif', alt_text: 'Take my money' },
         ];
